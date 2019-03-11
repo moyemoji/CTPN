@@ -7,6 +7,7 @@ ICDAR2015 format: [left_top_x left_top_y right_top_X right_top_y right_bottom_x 
 
 """
 
+# 将MSRA_TD500数据转换为ICDAR数据格式
 
 import math
 import cv2

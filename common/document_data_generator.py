@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
-
+# 文本数据生成器
 import os
 import argparse
 from argparse import RawTextHelpFormatter

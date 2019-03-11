@@ -1,7 +1,7 @@
 import torch.optim as optim  # 优化器
 import torch  # PyTorch包
 import cv2  # OpenCV
-import lib.tag_anchor
+import lib.tag_anchor # 用来标记是正样本还是负样本
 import lib.generate_gt_anchor  # 生成实际（ground truth）锚框，作为训练、测试样本
 import lib.dataset_handler  # 图像预处理
 import lib.utils  # 小工具类，画框、图像base64互转、初始化权重等
@@ -9,20 +9,21 @@ import numpy as np  #numpy库
 import os  # 输入输出库
 import Net.net as Net  # CTPN网络类
 import Net.loss as Loss  # 损失函数类
-import ConfigParser  # 命令行参数解析库
-import time  # 时间库
+import configparser  # 命令行参数解析库，python自带
+import time  # 时间库，python自带
 import evaluate
-import logging  # 输出日志库
-import datetime  # 时间库
+import logging  # 输出日志库，python自带
+import datetime  # 时间库，python自带
 import copy  
 import random  # 随机库，打乱输入数据顺序之用（shuffle）
 import matplotlib.pyplot as plt  # matplotlib绘图库
 
 DRAW_PREFIX = './anchor_draw'
-MSRA = '/home/ljs/data_ready/MSRA_TD500'  # MSRA_TD500数据集路径
-ALI = '/home/ljs/data_ready/ali_icpr' # ali_icpr数据集路径
-DATASET_LIST = [MSRA, ALI]
-MODEL_SAVE_PATH = '/model'
+# MSRA = '/home/sambauser/ctpn_batch_num/data_ready/MSRA_TD500'  # MSRA_TD500数据集路径
+ALI = '/home/sambauser/ctpn_batch_num/data/ali_icpr' # ali_icpr数据集路径
+# DATASET_LIST = [MSRA, ALI]
+DATASET_LIST = [ALI]
+MODEL_SAVE_PATH = './model'
 
 
 # 遍历文件夹，将文件名组成列表返回
@@ -62,6 +63,7 @@ def draw_loss_plot(train_loss_list=[], test_loss_list=[]):
     x2 = range(0, len(test_loss_list))
     y1 = train_loss_list
     y2 = test_loss_list
+    plt.switch_backend('agg')
     plt.subplot(2, 1, 1)
     plt.plot(x1, y1, 'o-')
     plt.title('train loss vs. iterators')
@@ -77,7 +79,7 @@ if __name__ == '__main__':
     #########################################
     ################ 加载超参 ################
     #########################################
-    cf = ConfigParser.ConfigParser()
+    cf = configparser.ConfigParser()
     cf.read('./config')  # 读取超参，是否使用GPU、迭代次数、模型保存频率，batch、学习率、epoch
 
     log_dir = './logs_10'  # 日志保存文件？不存在的话自动创建
@@ -148,7 +150,7 @@ if __name__ == '__main__':
 
     criterion = Loss.CTPN_Loss(using_cuda=using_cuda)  # 获取loss
 
-    train_im_list, train_gt_list, val_im_list, val_gt_list = create_train_val()  # 获取训练、测试数据
+    train_im_list, train_gt_list, val_im_list, val_gt_list = create_train_val()  # 获取所有训练、测试数据
     total_iter = len(train_im_list)
     print("total training image num is %s" % len(train_im_list))
     print("total val image num is %s" % len(val_im_list))
@@ -176,10 +178,11 @@ if __name__ == '__main__':
         random.shuffle(train_im_list)  # 打乱训练集
         # print(random_im_list)
         for im in train_im_list: # 每次只训练一张照片么？？？
-            root, file_name = os.path.split(im)  # 拆成路径和图片名
+            root, file_name = os.path.split(im)  # 拆成路径和带后缀图片名
             root, _ = os.path.split(root)  # root为图片所在文件夹
             name, _ = os.path.splitext(file_name)  # name为不带后缀文件名
-            gt_name = 'gt_' + name + '.txt'  # 构造gt_name.txt
+            # gt_name = 'gt_' + name + '.txt'  # 构造gt_name.txt
+            gt_name = name + '.txt'  # 构造gt_name.txt
 
             gt_path = os.path.join(root, "train_gt", gt_name)  # root_train_gt_gt_name
 

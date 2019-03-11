@@ -22,7 +22,8 @@ def val(net, criterion, batch_num, using_cuda, logger, img_list):
         root, file_name = os.path.split(im)
         root, _ = os.path.split(root)
         name, _ = os.path.splitext(file_name)
-        gt_name = 'gt_' + name + '.txt'
+        # gt_name = 'gt_' + name + '.txt'
+        gt_name = name + '.txt'
         gt_path = os.path.join(root, "test_gt", gt_name)
         if not os.path.exists(gt_path):
             print('Ground truth file of image {0} not exists.'.format(gt_path))

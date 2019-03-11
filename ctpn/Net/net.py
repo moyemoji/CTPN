@@ -1,3 +1,5 @@
+import sys
+sys.path.append("/home/sambauser/ctpn_batch_num/ctpn/Net")
 import torch.nn as nn
 import torch.nn.functional as F
 import img2col

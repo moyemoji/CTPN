@@ -1,4 +1,5 @@
 import sys
+sys.path.append('/home/sambauser/ctpn_batch_num/ctpn/lib')
 import math
 import copy
 import cv2
