@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-# 计算IOU
+# 计算IOU，只和y、h相关
 def cal_IoU(cy1, h1, cy2, h2):
     y_top1, y_bottom1 = cal_y(cy1, h1)
     y_top2, y_bottom2 = cal_y(cy2, h2)
@@ -43,8 +43,8 @@ def tag_anchor(gt_anchor, cnn_output, gt_box):
     # 0.7和IOU阈值是一样的，这样能保证在某个尺寸满足0.7时，下个尺寸不再满足，确保anchor唯一性
     anchor_height = [11, 16, 22, 32, 46, 66, 94, 134, 191, 273]  
     # whole image h and w
-    height = cnn_output.shape[2]  # 这是图片的高度么？
-    width = cnn_output.shape[3]  # 这是图片的宽度么？
+    height = cnn_output.shape[2]  # 这是默认的锚框（16*16）的行
+    width = cnn_output.shape[3]  # 这是默认的锚框（16*16）的列
     positive = []
     negative = []
     vertical_reg = []
@@ -54,7 +54,7 @@ def tag_anchor(gt_anchor, cnn_output, gt_box):
     left_side = False
     right_side = False
 
-    # 遍历一个ground truth box中的所有anchors，是一个个小anchor
+    # 遍历一个ground truth box中的所有anchors，是一个个小anchor（16宽，高不定）
     for a in gt_anchor:
 
         # a[0]表示anchor的水平id，如果水平id比图片宽度还宽，跳过
@@ -76,28 +76,28 @@ def tag_anchor(gt_anchor, cnn_output, gt_box):
         # 针对这个小anchor
         iou = np.zeros((height, len(anchor_height)))
         temp_positive = []
-        for i in range(iou.shape[0]):  # 默认锚框中的哪个y和h能和gt_anchor的y和h产生大于0.7的IOU
+        for i in range(iou.shape[0]):  # 默认锚框（宽为16，高有10种）中的哪个y和h能和gt_anchor的y和h产生大于0.7的IOU
             for j in range(iou.shape[1]):
-                if not valid_anchor((float(i) * 16.0 + 7.5), anchor_height[j], height):
+                if not valid_anchor((float(i) * 16.0 + 7.5), anchor_height[j], height):  # 第i行的，anchor_height为第j种的默认的锚框（如第5行，高度为22的锚框）
                     continue
-                iou[i][j] = cal_IoU((float(i) * 16.0 + 7.5), anchor_height[j], a[1], a[2])
+                iou[i][j] = cal_IoU((float(i) * 16.0 + 7.5), anchor_height[j], a[1], a[2])  # 计算默认的锚框和实际锚框的IOU
 
-                if iou[i][j] > 0.7:
-                    temp_positive.append((a[0], i, j, iou[i][j]))
+                if iou[i][j] > 0.7:  # 如果IOU大于0.7的话，认为是正样本
+                    temp_positive.append((a[0], i, j, iou[i][j]))  # position保存的是默认锚框的某一个，格式为【实际样本的x轴ID，默认锚框的行数，默认锚框的尺寸种类数，IOU】
                     if left_side:
                         o = (float(x_left_side) - (float(a[0]) * 16.0 + 7.5)) / 16.0
-                        side_refinement_reg.append((a[0], i, j, o))
+                        side_refinement_reg.append((a[0], i, j, o))  # 如果是左边界，边框回归值存储的是【实际样本的x轴ID，默认锚框的行数，默认锚框的尺寸种类数，边框回归比率】
                     if right_side:
                         o = (float(x_right_side) - (float(a[0]) * 16.0 + 7.5)) / 16.0
                         side_refinement_reg.append((a[0], i, j, o))
 
-                if iou[i][j] < 0.5:
+                if iou[i][j] < 0.5:  # 如果IOU小于0.5的话，认为是负样本
                     negative.append((a[0], i, j, iou[i][j]))
 
                 if iou[i][j] > 0.5:
-                    vc = (a[1] - (float(i) * 16.0 + 7.5)) / float(anchor_height[j])
-                    vh = math.log10(float(a[2]) / float(anchor_height[j]))
-                    vertical_reg.append((a[0], i, j, vc, vh, iou[i][j]))
+                    vc = (a[1] - (float(i) * 16.0 + 7.5)) / float(anchor_height[j])  # 实际中心的位置，缩放比例
+                    vh = math.log10(float(a[2]) / float(anchor_height[j]))  # 实际高度，缩放比例
+                    vertical_reg.append((a[0], i, j, vc, vh, iou[i][j]))  # 非负样本都要计算垂直回归值，【实际样本的x轴ID，默认锚框的行数，默认锚框的尺寸种类数，中心缩放比率，高度缩放比例，IOU】
 
         if len(temp_positive) == 0:
             max_position = np.where(iou == np.max(iou))

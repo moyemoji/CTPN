@@ -150,7 +150,7 @@ if __name__ == '__main__':
 
     criterion = Loss.CTPN_Loss(using_cuda=using_cuda)  # 获取loss
 
-    train_im_list, train_gt_list, val_im_list, val_gt_list = create_train_val()  # 获取所有训练、测试数据
+    train_im_list, train_gt_list, val_im_list, val_gt_list = create_train_val()  # 获取所有训练、测试数据文件地址列表
     total_iter = len(train_im_list)
     print("total training image num is %s" % len(train_im_list))
     print("total val image num is %s" % len(val_im_list))
@@ -190,21 +190,26 @@ if __name__ == '__main__':
                 print('Ground truth file of image {0} not exists.'.format(im))
                 continue
 
-            gt_txt = lib.dataset_handler.read_gt_file(gt_path)  # 读取对应的标签，把标签转为list返回
+            gt_txt = lib.dataset_handler.read_gt_file(gt_path)  # 读取对应的标签，把标签转为list返回，每个元素为一个bbox的4个坐标
             #print("processing image %s" % os.path.join(img_root1, im))
-            img = cv2.imread(im)
+            img = cv2.imread(im) # 把图片读取为opencv对象
             if img is None:  # 图片不存在的话返回
                 iteration += 1
                 continue
 
-            img, gt_txt = lib.dataset_handler.scale_img(img, gt_txt)  # 图像和标签做归一化
-            tensor_img = img[np.newaxis, :, :, :]  # 将图片数据变成tensor的一条记录
-            tensor_img = tensor_img.transpose((0, 3, 1, 2))  # 按照torch对图片的格式要求，修改图片的轴
+            img, gt_txt = lib.dataset_handler.scale_img(img, gt_txt)  # 图像缩放，保证最短边为600，标签也同步缩放
+            tensor_img = img[np.newaxis, :, :, :]  # 将图片数据变成tensor的一条记录，加一个中括号
+            tensor_img = tensor_img.transpose((0, 3, 1, 2))  # 按照torch对图片的格式要求，修改图片的轴，从[h,w,c]——>[c,h,w]
             if using_cuda:
                 tensor_img = torch.FloatTensor(tensor_img).cuda()
             else:
-                tensor_img = torch.FloatTensor(tensor_img)
-
+                tensor_img = torch.FloatTensor(tensor_img)  # 将img像素值转为float的tensor
+            
+            # tensor_img       [1, 3, 600, 919]
+            # vertical_pred    [1, 20, 37, 57]
+            # score            [1, 20, 37, 57]
+            # side_refinement  [1, 10, 37, 57]
+            # 原图片中锚框大小为16*16，网络对每个锚框的10种子锚框进行预测，包含了其坐标yh和前景、背景得分，边框回归值
             vertical_pred, score, side_refinement = net(tensor_img)  # 正向计算，获取预测结果
             del tensor_img
 
@@ -220,11 +225,16 @@ if __name__ == '__main__':
             try:
                 # loop all bbox in one image
                 # 遍历一张图片中的所有bbox
-                for box in gt_txt:
-                    # 从一个bbox中生成anchors
+                # 这里很花时间，平均需要花费6s一张图
+                for box in gt_txt:  # gt_txt为实际样本图片中的所有bbox的四个坐标
+                    # 从一个bbox中生成anchors，生成一小条一小条竖的anchor
                     # generate anchors from one bbox
-                    gt_anchor, visual_img = lib.generate_gt_anchor.generate_gt_anchor(img, box, draw_img_gt=visual_img)  # 获取图像的anchor标签
-                    positive1, negative1, vertical_reg1, side_refinement_reg1 = lib.tag_anchor.tag_anchor(gt_anchor, score, box)  # 计算预测值反映在anchor层面的数据
+                    # 获取图像的anchor标签
+                    gt_anchor, visual_img = lib.generate_gt_anchor.generate_gt_anchor(img, box, draw_img_gt=visual_img)  
+                    # 计算预测值反映在anchor层面的数据，可以理解为将预测值转为anchor的属性
+                    # 有了真实的一小条anchor，加上网络对各个锚框10种尺寸anchor的score，就能从默认的10种尺寸锚框中区分出正样本和负样本，
+                    # 垂直回归y和h的缩放比率，边框缩放比率
+                    positive1, negative1, vertical_reg1, side_refinement_reg1 = lib.tag_anchor.tag_anchor(gt_anchor, score, box)  
                     positive += positive1
                     negative += negative1
                     vertical_reg += vertical_reg1
@@ -240,7 +250,7 @@ if __name__ == '__main__':
 
             cv2.imwrite(os.path.join(DRAW_PREFIX, file_name), visual_img)
             optimizer.zero_grad()
-            # 计算成本函数Loss
+            # 计算成本函数Loss，score、vertical_pre、side_refinement为网络预测值，positive、negative、vertical_reg、side_refinement_reg为实际值
             loss, cls_loss, v_reg_loss, o_reg_loss = criterion(score, vertical_pred, side_refinement, positive,
                                                                negative, vertical_reg, side_refinement_reg)
             # 通过Loss反向传播
