@@ -1,4 +1,6 @@
 #coding=utf-8
+import sys
+sys.path.append('/home/sambauser/ctpn_batch_num/ctpn/lib')
 import cv2
 import numpy as np
 import os
@@ -22,7 +24,7 @@ THRESH_HOLD = 0.7
 NMS_THRESH = 0.3
 NEIGHBOURS_MIN_DIST = 50
 MIN_ANCHOR_BATCH = 2
-MODEL = './model/ctpn-msra_ali-9-end.model'
+MODEL = './model-0/ctpn-msra_ali-0-end.model'
 
 
 def threshold(coords, min_, max_):
@@ -349,6 +351,7 @@ def random_test(net):
 """
 
 if __name__ == '__main__':
+    # python infer.py random gpu
     running_mode = sys.argv[2]  # cpu or gpu
     print("Mode: %s" % running_mode)
     net = Net.CTPN()
