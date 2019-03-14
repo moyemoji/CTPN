@@ -1,5 +1,6 @@
 import numpy as np
 import math
+import time
 
 # 计算IOU，只和y、h相关
 def cal_IoU(cy1, h1, cy2, h2):
@@ -19,8 +20,23 @@ def cal_IoU(cy1, h1, cy2, h2):
     intersection = line[line == 2].size
     return float(intersection)/float(union)
 
+def cal_IoU2(cy1, h1, cy2, h2):
+    y_top1, y_bottom1 = cal_y(cy1, h1)
+    y_top2, y_bottom2 = cal_y(cy2, h2)
+    y_top_min = min(y_top1, y_top2)
+    y_bottom_max = max(y_bottom1, y_bottom2)
+    union = y_bottom_max - y_top_min + 1
+    intersection = h1 + h2 - union
+    iou = float(intersection)/float(union)
+    if iou<0:
+        return 0.0
+    else:
+        return iou
+
 
 # 通过h和cy计算anchor的上下界限
+# cy = (float(y_bottom[i]) + float(y_top[i])) / 2.0
+# h = y_bottom[i] - y_top[i] + 1
 def cal_y(cy, h):
     y_top = int(cy - (float(h) - 1) / 2.0)
     y_bottom = int(cy + (float(h) - 1) / 2.0)
@@ -76,12 +92,14 @@ def tag_anchor(gt_anchor, cnn_output, gt_box):
         # 针对这个小anchor
         iou = np.zeros((height, len(anchor_height)))
         temp_positive = []
+        
         for i in range(iou.shape[0]):  # 默认锚框（宽为16，高有10种）中的哪个y和h能和gt_anchor的y和h产生大于0.7的IOU
             for j in range(iou.shape[1]):
                 if not valid_anchor((float(i) * 16.0 + 7.5), anchor_height[j], height):  # 第i行的，anchor_height为第j种的默认的锚框（如第5行，高度为22的锚框）
                     continue
-                iou[i][j] = cal_IoU((float(i) * 16.0 + 7.5), anchor_height[j], a[1], a[2])  # 计算默认的锚框和实际锚框的IOU
-
+                iou[i][j] = cal_IoU2((float(i) * 16.0 + 7.5), anchor_height[j], a[1], a[2])  # 计算默认的锚框和实际锚框的IOU
+                # print("iou1---"+str(iou[i][j]))
+                # print("iou2---"+str(cal_IoU2((float(i) * 16.0 + 7.5), anchor_height[j], a[1], a[2])))
                 if iou[i][j] > 0.7:  # 如果IOU大于0.7的话，认为是正样本
                     temp_positive.append((a[0], i, j, iou[i][j]))  # position保存的是默认锚框的某一个，格式为【实际样本的x轴ID，默认锚框的行数，默认锚框的尺寸种类数，IOU】
                     if left_side:

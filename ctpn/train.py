@@ -222,6 +222,7 @@ if __name__ == '__main__':
 
             visual_img = copy.deepcopy(img)  # 该图用于可视化标签
 
+            tic = time.time()
             try:
                 # loop all bbox in one image
                 # 遍历一张图片中的所有bbox
@@ -230,11 +231,12 @@ if __name__ == '__main__':
                     # 从一个bbox中生成anchors，生成一小条一小条竖的anchor
                     # generate anchors from one bbox
                     # 获取图像的anchor标签
+                    
                     gt_anchor, visual_img = lib.generate_gt_anchor.generate_gt_anchor(img, box, draw_img_gt=visual_img)  
                     # 计算预测值反映在anchor层面的数据，可以理解为将预测值转为anchor的属性
                     # 有了真实的一小条anchor，加上网络对各个锚框10种尺寸anchor的score，就能从默认的10种尺寸锚框中区分出正样本和负样本，
                     # 垂直回归y和h的缩放比率，边框缩放比率
-                    positive1, negative1, vertical_reg1, side_refinement_reg1 = lib.tag_anchor.tag_anchor(gt_anchor, score, box)  
+                    positive1, negative1, vertical_reg1, side_refinement_reg1 = lib.tag_anchor.tag_anchor(gt_anchor, score, box) 
                     positive += positive1
                     negative += negative1
                     vertical_reg += vertical_reg1
@@ -243,6 +245,9 @@ if __name__ == '__main__':
                 print("warning: img %s raise error!" % im)
                 iteration += 1
                 continue
+
+            toc = time.time()
+            print("花费时间为："+str(toc-tic)) 
 
             if len(vertical_reg) == 0 or len(positive) == 0 or len(side_refinement_reg) == 0:
                 iteration += 1
@@ -269,6 +274,7 @@ if __name__ == '__main__':
                 print('Epoch: {2}/{3}, Iteration: {0}/{1}, loss: {4}, cls_loss: {5}, v_reg_loss: {6}, o_reg_loss: {7}, {8}'.
                       format(iteration, total_iter, i, epoch, total_loss / display_iter, total_cls_loss / display_iter,
                              total_v_reg_loss / display_iter, total_o_reg_loss / display_iter, im))
+                print()
 
                 logger.info('Epoch: {2}/{3}, Iteration: {0}/{1}'.format(iteration, total_iter, i, epoch))
                 logger.info('loss: {0}'.format(total_loss / display_iter))
